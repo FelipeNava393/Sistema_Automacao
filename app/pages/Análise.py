@@ -5,12 +5,20 @@ from services.ena import *
 from services.ear import *
 from services.fator_alavancagem import *
 
+# --- Configuração inicial ---
+st.set_page_config(page_title="Relatório e Fator de Alavancagem", layout="wide")
+
+# --- Cria as abas principais ---
 tab1, tab2 = st.tabs(["Relatório Mensal", "Fator de Alavancagem"])
 
+# ===============================
+# CLASSE RELATÓRIO MENSAL
+# ===============================
 class RelatorioMensal:
     def __init__(self):
         st.header("Relatório Mensal")
-        # Selectbox para escolher a automação
+
+        # Opções de automação ficaram aqui...
         self.automacao = st.selectbox(
             "Selecione a automação desejada:",
             ("Automação ENA", "Automação EAR"),
@@ -70,74 +78,68 @@ class RelatorioMensal:
             except Exception as e:
                 st.error(f"Erro ao processar dados: {e}")
 
+    """Incluir as próximas automações que forem possíveis.
+        def pld()...
+    """
+# ===============================
+# CLASSE FATOR DE ALAVANCAGEM
+# ===============================
 class FatorAlavancagem:
-    def __init__(self):
-        st.header("Fator de Alavancagem")
-        self.opcao = st.selectbox(
-            "Selecione a opção desejada:",
-            ("Tabela", "Gráficos"),
-            key="fator_alavancagem_opcao"
-        )
-
+    #Carrega em cache e atualiza de 1 em 1 hora
     @st.cache_data(show_spinner=True, ttl=3600)
     def carregar_dados(_self):
-        """Carrega e trata os dados com cache."""
         df_fator = get_fator_alavancagem()
         df_tratado = tratamento_fa(df_fator)
+        # Trata a coluna como formato de data e depois ordena com o sort_values
         if "DATA_ENVIO_FATOR_ALAVANCAGEM" in df_tratado.columns:
-        # Converte para datetime
             df_tratado["DATA_ENVIO_FATOR_ALAVANCAGEM"] = pd.to_datetime(
-                df_tratado["DATA_ENVIO_FATOR_ALAVANCAGEM"], 
+                df_tratado["DATA_ENVIO_FATOR_ALAVANCAGEM"],
                 dayfirst=True,
                 errors="coerce"
             )
-            df_tratado = df_tratado.sort_values(
-                by="DATA_ENVIO_FATOR_ALAVANCAGEM", 
-                ascending=False
-            )
-
+            df_tratado = df_tratado.sort_values(by="DATA_ENVIO_FATOR_ALAVANCAGEM", ascending=False)
         return df_tratado
+
+    def interface(self):
+        # abas internas da seção "Fator de Alavancagem"
+        tab3, tab4 = st.tabs(["Tabela", "Gráficos"])
+
+        with tab3:
+            self.tabela_fator_alavancagem()
+        with tab4:
+            self.graficos_fator_alavancagem()
 
     def tabela_fator_alavancagem(self):
         st.subheader("Tabela do Fator de Alavancagem")
-        st.text("Use os filtros abaixo para exibir os dados desejados:")
-
-        with st.spinner("Carregando dados do Fator de Alavancagem..."):
-            df_tratado = self.carregar_dados()
-
+        df_tratado = self.carregar_dados()
+        
+        # Carrega o session_state da contraparte selecionada e deixa o resto com o Streamlit
         if "contrapartes_select" not in st.session_state:
             st.session_state["contrapartes_select"] = []
-        if "df_filtrado_fa" not in st.session_state:
-            st.session_state["df_filtrado_fa"] = pd.DataFrame()
 
         contrapartes = contraparte_disponiveis(df_tratado)
+
+        # Joga o trabalho de salvar o último estado com o Streamlit
         contrapartes_select = st.multiselect(
-            'Selecione as Contrapartes:',
+            "Selecione as Contrapartes:",
             options=contrapartes,
-            default=st.session_state["contrapartes_select"],
             placeholder="Escolha uma ou mais contrapartes..."
         )
-        st.session_state["contrapartes_select"] = contrapartes_select
 
-        # --- aplica filtros normalmente ---
-        df_filtrado = df_tratado.copy()
+        st.session_state["contrapartes_select"] = contrapartes_select
 
         if not contrapartes_select:
             st.info("Selecione ao menos uma contraparte para exibir os dados.")
-            st.session_state["df_filtrado_fa"] = pd.DataFrame()
             return
-        
-        if contrapartes_select:
-            df_filtrado = filtro_contrapartes(df_filtrado, contrapartes_select)
 
-        df_filtrado = df_filtrado.sort_values(by=['SIGLA_AGENTE', 'DATA_ENVIO_FATOR_ALAVANCAGEM'], ascending=[True, False])
+        df_filtrado = filtro_contrapartes(df_tratado, contrapartes_select)
         st.session_state["df_filtrado_fa"] = df_filtrado
+
         if df_filtrado.empty:
             st.warning("Nenhum registro encontrado para os filtros aplicados.")
         else:
             st.success(f"{len(df_filtrado)} registros encontrados.")
             st.dataframe(df_filtrado)
-
 
     def graficos_fator_alavancagem(self):
         st.subheader("Gráficos do Fator de Alavancagem")
@@ -147,65 +149,53 @@ class FatorAlavancagem:
             return
 
         df = st.session_state["df_filtrado_fa"]
-        st.write(f"Exibindo {len(df)} registros filtrados.")
-        # Localiza a linha com o maior FATOR_ALAVANCAGEM (%)
-        col1, col2 = st.columns(2)
 
-        # KPI 1: Máximo FA e Contraparte
+        # KPI e gráficos
         linha_max = df['FATOR_ALAVANCAGEM (%)'].idxmax()
         max_fa = df.loc[linha_max, 'FATOR_ALAVANCAGEM (%)']
         agente_max = df.loc[linha_max, 'SIGLA_AGENTE']
 
+        col1, col2= st.columns(2)
+        
+        # Breve explicação dos indicadores na barra lateral.
+        with st.sidebar:
+            with st.expander("ℹ️ Ajuda: Entendendo os indicadores"):
+                st.markdown("""
+                **Desvio Padrão por Contraparte**  
+                Mede a variabilidade do Fator de Alavancagem (FA) de cada agente ao longo do tempo.  
+                Matematicamente, representa a raiz quadrada da variância.  
+                Valores menores indicam comportamento mais estável.
+
+                **Média do Desvio Padrão**  
+                É a média da dispersão de todas as contrapartes selecionadas.  
+                Valores baixos indicam consistência entre os agentes, enquanto altos indicam maior instabilidade.
+                """)
         with col1:
             st.metric("Fator de Alavancagem Máximo (%)", f"{max_fa:.2f}")
             st.write(f"Contraparte com maior FA: **{agente_max}**")
 
-        # KPI 2: Desvio Padrão por contraparte
-        desvio_padrao_por_contraparte = df.groupby('SIGLA_AGENTE')['FATOR_ALAVANCAGEM (%)'].std().reset_index()
-
+        desvio_padrao = df.groupby('SIGLA_AGENTE')['FATOR_ALAVANCAGEM (%)'].std().reset_index()
         with col2:
-            st.metric("Média do Desvio Padrão (%)", f"{desvio_padrao_por_contraparte['FATOR_ALAVANCAGEM (%)'].mean():.2f}")
+            st.metric("Média do Desvio Padrão (%)", f"{desvio_padrao['FATOR_ALAVANCAGEM (%)'].mean():.2f}")
 
-        # --- Gráfico de Desvio Padrão ---
-        st.subheader("Desvio Padrão do Fator de Alavancagem por Contraparte")
-        fig_std = px.bar(
-            desvio_padrao_por_contraparte,
-            x='SIGLA_AGENTE',
-            y='FATOR_ALAVANCAGEM (%)',
-            title='Desvio Padrão do Fator de Alavancagem por Contraparte',
-            labels={'SIGLA_AGENTE': 'Contraparte', 'FATOR_ALAVANCAGEM (%)': 'Desvio Padrão (%)'},
-            color='SIGLA_AGENTE'
-        )
+        st.subheader("Desvio Padrão por Contraparte")
+        fig_std = px.bar(desvio_padrao, x='SIGLA_AGENTE', y='FATOR_ALAVANCAGEM (%)', color='SIGLA_AGENTE')
         st.plotly_chart(fig_std, use_container_width=True)
 
-        # --- Gráfico do Fator de Alavancagem ao longo do tempo ---
-        st.subheader("Fator de Alavancagem ao Longo do Tempo por Contraparte")
-        fig_fa = px.scatter(
-            df,
-            x="DATA_ENVIO_FATOR_ALAVANCAGEM",
-            y="FATOR_ALAVANCAGEM (%)",
-            color="SIGLA_AGENTE",
-            title="Fator de Alavancagem ao Longo do Tempo",
-            labels={"DATA_ENVIO_FATOR_ALAVANCAGEM": "Data de Envio", "FATOR_ALAVANCAGEM (%)": "Fator de Alavancagem (%)"},
-            hover_data=["CNPJ"]  # opcional para exibir CNPJs ao passar o mouse
-        )
+        st.subheader("Fator de Alavancagem ao Longo do Tempo")
+        fig_fa = px.scatter(df, x="DATA_ENVIO_FATOR_ALAVANCAGEM", y="FATOR_ALAVANCAGEM (%)", color="SIGLA_AGENTE")
         st.plotly_chart(fig_fa, use_container_width=True)
-        
-# --- Execução principal ---
-if __name__ == "__main__":
-    with tab1:
-        relatorio = RelatorioMensal()
-        match relatorio.automacao:
-            case "Automação ENA":
-                relatorio.automacao_ena()
-            case "Automação EAR":
-                relatorio.automacao_ear()
 
-    with tab2:
-        indicador_alavancagem = FatorAlavancagem()
-        match indicador_alavancagem.opcao:
-            case "Tabela":
-                indicador_alavancagem.tabela_fator_alavancagem()
-            case "Gráficos":
-                indicador_alavancagem.graficos_fator_alavancagem()
-        
+# ===============================
+# EXECUÇÃO PRINCIPAL
+# ===============================
+with tab1:
+    relatorio = RelatorioMensal()
+    if relatorio.automacao == "Automação ENA":
+        relatorio.automacao_ena()
+    elif relatorio.automacao == "Automação EAR":
+        relatorio.automacao_ear()
+
+with tab2:
+    fa = FatorAlavancagem()
+    fa.interface()
