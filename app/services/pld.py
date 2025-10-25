@@ -1,4 +1,3 @@
-from re import sub
 import requests
 import pandas as pd
 
@@ -73,3 +72,4 @@ def pld_filtrado(df: pd.DataFrame, submercado: list, periodo: list) -> pd.DataFr
         return df_filtrado
 
     return pd.DataFrame()
+
