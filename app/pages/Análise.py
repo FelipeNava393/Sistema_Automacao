@@ -4,6 +4,7 @@ import plotly_express as px
 from services.ena import *
 from services.ear import *
 from services.fator_alavancagem import *
+from services.pld import * 
 
 # --- Configuração inicial ---
 st.set_page_config(page_title="Relatório e Fator de Alavancagem", layout="wide")
@@ -21,7 +22,7 @@ class RelatorioMensal:
         # Opções de automação ficaram aqui...
         self.automacao = st.selectbox(
             "Selecione a automação desejada:",
-            ("Automação ENA", "Automação EAR"),
+            ("Automação ENA", "Automação EAR", "Automação PLD"),
             key="automacao_selecionada"
         )
         st.write("---")
@@ -78,9 +79,38 @@ class RelatorioMensal:
             except Exception as e:
                 st.error(f"Erro ao processar dados: {e}")
 
-    """Incluir as próximas automações que forem possíveis.
-        def pld()...
-    """
+    def pld_mensal(self):
+        col1, col2 = st.columns(2)
+        df_pld = get_pld_mensal()
+        df_pld_tratado = tratamento_pld(df_pld)
+
+        with col1:
+            try:
+                submercado_escolhido = st.multiselect(
+                    "Escolha o(s) submercado(s) para o filtro",
+                    options=submercado_disponivel(df_pld_tratado)
+                )
+            except Exception as e:
+                st.error(f"Erro ao carregar submercados: {e}")
+                return
+
+        with col2:
+            try:
+                periodo_escolhido = st.multiselect(
+                    "Escolha o(s) período(s) para o filtro",
+                    options=periodo_disponivel(df_pld_tratado)
+                )
+            except Exception as e:
+                st.error(f"Erro ao carregar períodos: {e}")
+                return
+
+        # Aplica o filtro
+        df_filtrado = pld_filtrado(df_pld_tratado, submercado_escolhido, periodo_escolhido)
+
+        # Exibe os dados filtrados
+        st.subheader("PLD Mensal Filtrado")
+        st.dataframe(df_filtrado)
+
 # ===============================
 # CLASSE FATOR DE ALAVANCAGEM
 # ===============================
@@ -195,6 +225,8 @@ with tab1:
         relatorio.automacao_ena()
     elif relatorio.automacao == "Automação EAR":
         relatorio.automacao_ear()
+    elif relatorio.automacao == "Automação PLD":
+        relatorio.pld_mensal()
 
 with tab2:
     fa = FatorAlavancagem()
