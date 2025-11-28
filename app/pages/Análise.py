@@ -204,7 +204,9 @@ class FatorAlavancagem:
             st.metric("Fator de Alavancagem Máximo (%)", f"{max_fa:.2f}")
             st.write(f"Contraparte com maior FA: **{agente_max}**")
 
-        desvio_padrao = df.groupby('SIGLA_AGENTE')['FATOR_ALAVANCAGEM (%)'].std().reset_index()
+        df_filtrado_std = df[df['FATOR_ALAVANCAGEM (%)'] >= 0]
+        desvio_padrao = df_filtrado_std.groupby('SIGLA_AGENTE')['FATOR_ALAVANCAGEM (%)'].std().reset_index() # Desvio padrão ignora valores negativos para ser fiel ao cálculo
+        
         with col2:
             st.metric("Média do Desvio Padrão (%)", f"{desvio_padrao['FATOR_ALAVANCAGEM (%)'].mean():.2f}")
 
@@ -231,3 +233,4 @@ with tab1:
 with tab2:
     fa = FatorAlavancagem()
     fa.interface()
+
