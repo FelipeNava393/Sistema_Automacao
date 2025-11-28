@@ -5,6 +5,7 @@ from services.ena import *
 from services.ear import *
 from services.fator_alavancagem import *
 from services.pld import * 
+from services.pld_diario import *
 
 # --- Configuração inicial ---
 st.set_page_config(page_title="Relatório e Fator de Alavancagem", layout="wide")
@@ -22,7 +23,7 @@ class RelatorioMensal:
         # Opções de automação ficaram aqui...
         self.automacao = st.selectbox(
             "Selecione a automação desejada:",
-            ("Automação ENA", "Automação EAR", "Automação PLD"),
+            ("Automação ENA", "Automação EAR", "Automação PLD", "PLD Diário"),
             key="automacao_selecionada"
         )
         st.write("---")
@@ -96,20 +97,52 @@ class RelatorioMensal:
 
         with col2:
             try:
+                periodos = periodo_disponivel(df_pld_tratado)
                 periodo_escolhido = st.multiselect(
                     "Escolha o(s) período(s) para o filtro",
-                    options=periodo_disponivel(df_pld_tratado)
+                    options=periodos
                 )
+    
             except Exception as e:
                 st.error(f"Erro ao carregar períodos: {e}")
                 return
 
         # Aplica o filtro
+        if st.button("Selecionar todos os períodos"):
+            periodo_escolhido = periodos
         df_filtrado = pld_filtrado(df_pld_tratado, submercado_escolhido, periodo_escolhido)
 
         # Exibe os dados filtrados
         st.subheader("PLD Mensal Filtrado")
         st.dataframe(df_filtrado)
+    
+    def pld_diario(self):
+        col1, col2 = st.columns(2)
+
+        df_pld_diario = get_pld_diario()
+        pld = pld_diario(df_pld_diario)
+        periodo = periodo_pld(pld)
+
+        with col2:
+            periodo_escolhido = st.multiselect(
+                "Selecione o período:",
+                options=["Todos"] + periodo,
+                default=["Todos"]
+            )
+
+        # Se "Todos" estiver selecionado, não filtra
+        if "Todos" in periodo_escolhido:
+            pld_filtrado = pld
+        else:
+            pld_filtrado = pld[pld["MES_REFERENCIA"].isin(periodo_escolhido)]
+
+        # Agora sim: média com o dataframe filtrado
+        media_pld = media_pld_diario(pld_filtrado)
+
+        st.success(f"A média do PLD para o período filtrado é de: {media_pld:.2f}")
+
+        with col1:
+            st.dataframe(pld_filtrado, use_container_width=True)
 
 # ===============================
 # CLASSE FATOR DE ALAVANCAGEM
@@ -206,7 +239,7 @@ class FatorAlavancagem:
 
         df_filtrado_std = df[df['FATOR_ALAVANCAGEM (%)'] >= 0]
         desvio_padrao = df_filtrado_std.groupby('SIGLA_AGENTE')['FATOR_ALAVANCAGEM (%)'].std().reset_index() # Desvio padrão ignora valores negativos para ser fiel ao cálculo
-        
+
         with col2:
             st.metric("Média do Desvio Padrão (%)", f"{desvio_padrao['FATOR_ALAVANCAGEM (%)'].mean():.2f}")
 
@@ -229,8 +262,9 @@ with tab1:
         relatorio.automacao_ear()
     elif relatorio.automacao == "Automação PLD":
         relatorio.pld_mensal()
+    elif relatorio.automacao == "PLD Diário":
+        relatorio.pld_diario()
 
 with tab2:
     fa = FatorAlavancagem()
     fa.interface()
-
