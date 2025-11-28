@@ -39,7 +39,7 @@ def get_fator_alavancagem() -> pd.DataFrame:
 
 def tratamento_fa(df: pd.DataFrame) -> pd.DataFrame:
     df = df.drop(['_id', 'MES_DO_EVENTO', 'CODIGO_EVENTO', 'TIPO_EVENTO', 'TIPO_CALCULO', 'VERSAO_CALCULO'], axis=1, errors='ignore')
-    df = df.fillna(0)
+    df = df.fillna(-1)
     df = df.rename(columns={'FATOR_ALAVANCAGEM': 'FATOR_ALAVANCAGEM (%)'})
     df['FATOR_ALAVANCAGEM (%)'] = pd.to_numeric(df['FATOR_ALAVANCAGEM (%)'], errors='coerce') * 100
     return df
