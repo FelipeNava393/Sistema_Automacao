@@ -8,22 +8,22 @@ from services.pld import *
 from services.pld_diario import *
 
 # --- Configuração inicial ---
-st.set_page_config(page_title="Relatório e Fator de Alavancagem", layout="wide")
+st.set_page_config(page_title="Dados do Setor", layout="wide")
 
 # --- Cria as abas principais ---
-tab1, tab2 = st.tabs(["Relatório Mensal", "Fator de Alavancagem"])
+tab1, tab2 = st.tabs(["Informações Gerais", "Fator de Alavancagem"])
 
 # ===============================
 # CLASSE RELATÓRIO MENSAL
 # ===============================
-class RelatorioMensal:
+class InfoGerais:
     def __init__(self):
-        st.header("Relatório Mensal")
+        st.header("Informações Gerais")
 
         # Opções de automação ficaram aqui...
         self.automacao = st.selectbox(
             "Selecione a automação desejada:",
-            ("Automação ENA", "Automação EAR", "Automação PLD", "PLD Diário"),
+            ("Automação ENA", "Automação EAR", "PLD Mensal", "PLD Diário"),
             key="automacao_selecionada"
         )
         st.write("---")
@@ -126,23 +126,26 @@ class RelatorioMensal:
         with col2:
             periodo_escolhido = st.multiselect(
                 "Selecione o período:",
-                options=["Todos"] + periodo,
-                default=["Todos"]
+                options=["Todos"] + periodo
             )
 
-        # Se "Todos" estiver selecionado, não filtra
+        if not periodo_escolhido:
+            st.info("Selecione ao menos 1 período para visualizar os dados.")
+            return
+
         if "Todos" in periodo_escolhido:
             pld_filtrado = pld
+
         else:
             pld_filtrado = pld[pld["MES_REFERENCIA"].isin(periodo_escolhido)]
 
-        # Agora sim: média com o dataframe filtrado
         media_pld = media_pld_diario(pld_filtrado)
 
-        st.success(f"A média do PLD para o período filtrado é de: {media_pld:.2f}")
+        st.success(f"Média do PLD para o período filtrado: {media_pld:.2f}")
 
         with col1:
             st.dataframe(pld_filtrado, use_container_width=True)
+
 
 # ===============================
 # CLASSE FATOR DE ALAVANCAGEM
@@ -255,12 +258,12 @@ class FatorAlavancagem:
 # EXECUÇÃO PRINCIPAL
 # ===============================
 with tab1:
-    relatorio = RelatorioMensal()
+    relatorio = InfoGerais()
     if relatorio.automacao == "Automação ENA":
         relatorio.automacao_ena()
     elif relatorio.automacao == "Automação EAR":
         relatorio.automacao_ear()
-    elif relatorio.automacao == "Automação PLD":
+    elif relatorio.automacao == "PLD Mensal":
         relatorio.pld_mensal()
     elif relatorio.automacao == "PLD Diário":
         relatorio.pld_diario()
